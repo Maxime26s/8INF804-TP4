@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
             if i % 200 == 0:
                 current_time = datetime.now()
-                log_entry = f"Log Time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}"
+                log_entry = f"{current_time.strftime('%Y-%m-%d %H:%M:%S')}"
                 log_entry += f" [Epoch {epoch}/{opt.n_epochs}] [Batch {i}/{len(dataloader)}] [D loss: {d_loss.item()}] [G loss: {g_loss.item()}]"
                 print(log_entry)
 
