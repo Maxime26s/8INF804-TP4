@@ -51,6 +51,12 @@ def parse_args():
         choices=["train", "eval"],
         help="Mode: train or eval",
     )
+    parser.add_argument(
+        "--current_epoch",
+        type=int,
+        default=0,
+        help="Current epoch (for loading saved models)",
+    )
     return parser.parse_args()
 
 
@@ -149,27 +155,30 @@ if __name__ == "__main__":
     # Load model parameters if required
     if args.load_model:
         if os.path.exists(args.model_path):
-            paremeters_path = os.join(args.model_path, "parameters_dict.json")
-            with open(paremeters_path, "r") as file:
-                saved_params = json.load(file)
+            paremeters_path = os.path.join(args.model_path, "parameters_dict.json")
+            if os.path.exists(paremeters_path):
+                with open(paremeters_path, "r") as file:
+                    saved_params = json.load(file)
 
-            args.batch_size = saved_params.get("batch_size", args.batch_size)
-            args.lr = saved_params.get("lr", args.lr)
-            args.latent_dim = saved_params.get("latent_dim", args.latent_dim)
-            args.img_size = saved_params.get("img_size", args.img_size)
-            args.normalization_choice = saved_params.get(
-                "normalization_choice", args.normalization_choice
-            )
-            args.channels = saved_params.get("channels", args.channels)
+                args.batch_size = saved_params.get("batch_size", args.batch_size)
+                args.lr = saved_params.get("lr", args.lr)
+                args.latent_dim = saved_params.get("latent_dim", args.latent_dim)
+                args.img_size = saved_params.get("img_size", args.img_size)
+                args.normalization_choice = saved_params.get(
+                    "normalization_choice", args.normalization_choice
+                )
+                args.channels = saved_params.get("channels", args.channels)
+                args.current_epoch = saved_params.get(
+                    "current_epoch", args.current_epoch
+                )
 
-            current_epoch = saved_params.get("current_epoch", 0)
             generator_path = os.path.join(
                 args.model_path,
-                f"generateur_epoch_{current_epoch}.pt",
+                f"generateur_epoch_{args.current_epoch}.pt",
             )
             discriminator_path = os.path.join(
                 args.model_path,
-                f"discriminateur_epoch_{current_epoch}.pt",
+                f"discriminateur_epoch_{args.current_epoch}.pt",
             )
 
             if os.path.exists(generator_path) and os.path.exists(discriminator_path):
@@ -179,7 +188,7 @@ if __name__ == "__main__":
                 discriminator.load_state_dict(
                     torch.load(discriminator_path, map_location=device)
                 )
-                print(f"Loaded model states from epoch {current_epoch}.")
+                print(f"Loaded model states from epoch {args.current_epoch}.")
             else:
                 print(
                     "Saved model states not found for specified epoch. Starting training from scratch."
