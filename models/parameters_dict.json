@@ -1,0 +1,9 @@
+{
+    "batch_size": 2048,
+    "lr": 0.0002,
+    "latent_dim": 64,
+    "img_size": 64,
+    "current_epoch": 4000,
+    "normalization_choice": 4,
+    "channels": 1
+}
