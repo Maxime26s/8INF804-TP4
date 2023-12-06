@@ -1,11 +1,11 @@
 import argparse
-from torchvision.utils import save_image
-import torch
-import os
 import json
+import os
+import torch
 
 from src.GAN import Discriminator, Generator
-from src.Utils import setup_data_loaders, display_generated_images
+from src.Training import train_and_evaluate_gan
+from src.Utils import setup_data_loaders, display_generated_images, display_images
 
 
 def parse_args():
@@ -66,99 +66,31 @@ def initialize_gan_model(latent_dim, img_shape, normalization_choice, device):
     return generator, discriminator
 
 
-def train_and_evaluate_gan(
-    generator,
-    discriminator,
-    dataloader,
-    optimizer_G,
-    optimizer_D,
-    adversarial_loss,
-    device,
-    args,
-    sample_interval,
-):
-    for epoch in range(args.n_epochs):
-        for i, (imgs, _) in enumerate(dataloader):
-            valid = torch.ones((imgs.size(0), 1), device=device, dtype=torch.float)
-            fake = torch.zeros((imgs.size(0), 1), device=device, dtype=torch.float)
-
-            # Configure input
-            real_imgs = imgs.to(device).type(torch.float)
-
-            # ---------------------
-            #  Train Generator
-            # ---------------------
-            optimizer_G.zero_grad()
-            z = torch.randn(
-                (imgs.shape[0], args.latent_dim), device=device, dtype=torch.float
-            )
-            gen_imgs = generator(z)
-            g_loss = adversarial_loss(discriminator(gen_imgs), valid)
-            g_loss.backward()
-            optimizer_G.step()
-
-            # ---------------------
-            #  Train Discriminator
-            # ---------------------
-            optimizer_D.zero_grad()
-            real_loss = adversarial_loss(discriminator(real_imgs), valid)
-            fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
-            d_loss = (real_loss + fake_loss) / 2
-            d_loss.backward()
-            optimizer_D.step()
-
-            batches_done = epoch * len(dataloader) + i
-            if batches_done % sample_interval == 0:
-                save_image(
-                    gen_imgs.data[:25],
-                    f"{args.model_path}/images/{batches_done}.png",
-                    nrow=5,
-                    normalize=True,
-                )
-
-        print(
-            f"[Epoch {epoch}/{args.n_epochs}] [D loss: {d_loss.item()}] [G loss: {g_loss.item()}]"
-        )
-
-        if epoch % sample_interval == 0:
-            current_params = {
-                "batch_size": args.batch_size,
-                "lr": args.lr,
-                "latent_dim": args.latent_dim,
-                "img_size": args.img_size,
-                "current_epoch": epoch,
-                "normalization_choice": args.normalization_choice,
-                "channels": args.channels,
-            }
-            with open(f"{args.model_path}/parameters_dict.json", "w") as file:
-                json.dump(current_params, file)
-
-            torch.save(
-                generator.state_dict(), f"{args.model_path}/generator_epoch_{epoch}.pt"
-            )
-            torch.save(
-                discriminator.state_dict(),
-                f"{args.model_path}/discriminator_epoch_{epoch}.pt",
-            )
-
-
 if __name__ == "__main__":
     args = parse_args()
+    print("Arguments parsed successfully.")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     img_shape = (args.channels, args.img_size, args.img_size)
+    print(f"Image shape set to: {img_shape}")
 
     generator, discriminator = initialize_gan_model(
         args.latent_dim, img_shape, args.normalization_choice, device
     )
+    print("Initialized generator and discriminator models.")
 
     # Load model parameters if required
     if args.load_model:
+        print(f"Attempting to load model from {args.model_path}...")
         if os.path.exists(args.model_path):
-            paremeters_path = os.path.join(args.model_path, "parameters_dict.json")
-            if os.path.exists(paremeters_path):
-                with open(paremeters_path, "r") as file:
+            parameters_path = os.path.join(args.model_path, "parameters_dict.json")
+            if os.path.exists(parameters_path):
+                with open(parameters_path, "r") as file:
                     saved_params = json.load(file)
+
+                print("Loaded saved model parameters.")
 
                 args.batch_size = saved_params.get("batch_size", args.batch_size)
                 args.lr = saved_params.get("lr", args.lr)
@@ -174,12 +106,13 @@ if __name__ == "__main__":
 
             generator_path = os.path.join(
                 args.model_path,
-                f"generateur_epoch_{args.current_epoch}.pt",
+                f"generator_epoch_{args.current_epoch}.pt",
             )
             discriminator_path = os.path.join(
                 args.model_path,
-                f"discriminateur_epoch_{args.current_epoch}.pt",
+                f"discriminator_epoch_{args.current_epoch}.pt",
             )
+            print(discriminator_path)
 
             if os.path.exists(generator_path) and os.path.exists(discriminator_path):
                 generator.load_state_dict(
@@ -200,11 +133,13 @@ if __name__ == "__main__":
 
     generator.to(device)
     discriminator.to(device)
+    print("Moved models to the designated device.")
 
     dataloader = setup_data_loaders(args.batch_size, args.img_size, "./images")
+    print("Data loader setup complete.")
 
     if args.mode == "train":
-        # Training mode
+        print("Entering training mode...")
         adversarial_loss = torch.nn.BCELoss()
         optimizer_G = torch.optim.Adam(
             generator.parameters(), lr=args.lr, betas=(args.b1, args.b2)
@@ -224,8 +159,21 @@ if __name__ == "__main__":
             100,
         )
     elif args.mode == "eval":
-        # Evaluation mode (image generation)
+        print("Entering evaluation mode...")
         generator.eval()
-        z = torch.randn(args.batch_size, args.latent_dim, device=device)
-        gen_imgs = generator(z).to(device)
+
+        # Fetch a batch of real images
+        real_images, _ = next(iter(dataloader))
+        real_images = real_images.to(device)
+
+        # Generate noise vector and produce fake images
+        z = torch.randn(real_images.size(0), args.latent_dim, device=device)
+        gen_imgs = generator(z)
+
+        # Display real images
+        print("Displaying real images...")
+        display_images(real_images, grayscale=(args.channels == 1))
+
+        # Display generated images
+        print("Displaying generated images...")
         display_generated_images(gen_imgs, grayscale=(args.channels == 1))
