@@ -3,7 +3,7 @@ import numpy as np
 
 
 class Generator(nn.Module):
-    def __init__(self, img_shape, latent_dim, normalization_choice):
+    def __init__(self, img_shape, latent_size, normalization_choice):
         super(Generator, self).__init__()
         self.img_shape = img_shape
 
@@ -21,7 +21,7 @@ class Generator(nn.Module):
             return layers
 
         self.model = nn.Sequential(
-            *block(latent_dim, 128, normalize=False),
+            *block(latent_size, 128, normalize=False),
             *block(128, 256),
             *block(256, 512),
             *block(512, 1024),

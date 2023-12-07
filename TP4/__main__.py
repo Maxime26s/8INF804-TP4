@@ -3,15 +3,16 @@ import json
 import os
 import torch
 
-from src.GAN import Discriminator, Generator
-from src.Training import train_and_evaluate_gan
+import src.GAN as GAN
+import src.DCGAN as DCGAN
+from src.Training import train_and_evaluate_gan, train_and_evaluate_dcgan
 from src.Utils import setup_data_loaders, display_generated_images, display_images
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_epochs", type=int, default=10000, help="Number of epochs")
-    parser.add_argument("--batch_size", type=int, default=2048, help="Batch size")
+    parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--lr", type=float, default=0.0002, help="Learning Rate")
     parser.add_argument(
         "--b1",
@@ -25,12 +26,12 @@ def parse_args():
         default=0.999,
         help="Beta 2 hyperparameter for Adam optimizers",
     )
-    parser.add_argument("--latent_dim", type=int, default=64, help="Latent dimension")
+    parser.add_argument("--latent_size", type=int, default=64, help="Latent dimension")
     parser.add_argument(
         "--img_size", type=int, default=64, help="Image size (width/height)"
     )
     parser.add_argument(
-        "--channels", type=int, default=1, help="Number of image channels"
+        "--n_channels", type=int, default=1, help="Number of image channels"
     )
     parser.add_argument(
         "--normalization_choice", type=int, default=4, help="Normalization choice (0-5)"
@@ -57,12 +58,27 @@ def parse_args():
         default=0,
         help="Current epoch (for loading saved models)",
     )
+    parser.add_argument(
+        "--gan_type",
+        type=str,
+        default="gan",
+        choices=["gan", "dcgan"],
+        help="GAN type: gan or dcgan",
+    )
     return parser.parse_args()
 
 
-def initialize_gan_model(latent_dim, img_shape, normalization_choice, device):
-    generator = Generator(img_shape, latent_dim, normalization_choice).to(device)
-    discriminator = Discriminator(img_shape, normalization_choice).to(device)
+def initialize_gan_model(img_shape, latent_size, normalization_choice, device):
+    generator = GAN.Generator(img_shape, latent_size, normalization_choice).to(device)
+    discriminator = GAN.Discriminator(img_shape, normalization_choice).to(device)
+    return generator, discriminator
+
+
+def initialize_dcgan_model(img_size, latent_size, n_channels, device):
+    generator = DCGAN.Generator(img_size, latent_size, n_channels).to(device)
+    generator.apply(DCGAN.weights_init)
+    discriminator = DCGAN.Discriminator(img_size, n_channels).to(device)
+    discriminator.apply(DCGAN.weights_init)
     return generator, discriminator
 
 
@@ -73,12 +89,17 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    img_shape = (args.channels, args.img_size, args.img_size)
+    img_shape = (args.n_channels, args.img_size, args.img_size)
     print(f"Image shape set to: {img_shape}")
 
-    generator, discriminator = initialize_gan_model(
-        args.latent_dim, img_shape, args.normalization_choice, device
-    )
+    if args.gan_type == "gan":
+        generator, discriminator = initialize_gan_model(
+            img_shape, args.latent_size, args.normalization_choice, device
+        )
+    elif args.gan_type == "dcgan":
+        generator, discriminator = initialize_dcgan_model(
+            args.img_size, args.latent_size, args.n_channels, device
+        )
     print("Initialized generator and discriminator models.")
 
     # Load model parameters if required
@@ -94,12 +115,12 @@ if __name__ == "__main__":
 
                 args.batch_size = saved_params.get("batch_size", args.batch_size)
                 args.lr = saved_params.get("lr", args.lr)
-                args.latent_dim = saved_params.get("latent_dim", args.latent_dim)
+                args.latent_size = saved_params.get("latent_size", args.latent_size)
                 args.img_size = saved_params.get("img_size", args.img_size)
                 args.normalization_choice = saved_params.get(
                     "normalization_choice", args.normalization_choice
                 )
-                args.channels = saved_params.get("channels", args.channels)
+                args.n_channels = saved_params.get("n_channels", args.n_channels)
                 args.current_epoch = saved_params.get(
                     "current_epoch", args.current_epoch
                 )
@@ -147,17 +168,31 @@ if __name__ == "__main__":
         optimizer_D = torch.optim.Adam(
             discriminator.parameters(), lr=args.lr, betas=(args.b1, args.b2)
         )
-        train_and_evaluate_gan(
-            generator,
-            discriminator,
-            dataloader,
-            optimizer_G,
-            optimizer_D,
-            adversarial_loss,
-            device,
-            args,
-            100,
-        )
+
+        if args.gan_type == "gan":
+            train_and_evaluate_gan(
+                generator,
+                discriminator,
+                dataloader,
+                optimizer_G,
+                optimizer_D,
+                adversarial_loss,
+                device,
+                args,
+                100,
+            )
+        elif args.gan_type == "dcgan":
+            train_and_evaluate_dcgan(
+                generator,
+                discriminator,
+                dataloader,
+                optimizer_G,
+                optimizer_D,
+                adversarial_loss,
+                device,
+                args,
+                10,
+            )
     elif args.mode == "eval":
         print("Entering evaluation mode...")
         generator.eval()
@@ -167,13 +202,13 @@ if __name__ == "__main__":
         real_images = real_images.to(device)
 
         # Generate noise vector and produce fake images
-        z = torch.randn(real_images.size(0), args.latent_dim, device=device)
+        z = torch.randn(real_images.size(0), args.latent_size, device=device)
         gen_imgs = generator(z)
 
         # Display real images
         print("Displaying real images...")
-        display_images(real_images, grayscale=(args.channels == 1))
+        display_images(real_images, grayscale=(args.n_channels == 1))
 
         # Display generated images
         print("Displaying generated images...")
-        display_generated_images(gen_imgs, grayscale=(args.channels == 1))
+        display_generated_images(gen_imgs, grayscale=(args.n_channels == 1))
