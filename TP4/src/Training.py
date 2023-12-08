@@ -27,6 +27,7 @@ def save_state(generator, discriminator, epoch, fixed_noise, args, history):
         "n_epochs": args.n_epochs,
         "gan_type": args.gan_type,
         "loss_function": args.loss_function,
+        "seed": args.seed,
         "history": history,
     }
     with open(f"{args.model_path}/parameters_dict.json", "w") as file:
@@ -39,21 +40,15 @@ def save_state(generator, discriminator, epoch, fixed_noise, args, history):
     )
 
 
-def print_progress(epoch, n_epochs, len_dataloader, d_loss, g_loss):
+def print_progress(epoch, n_epochs, batch, n_batch, d_loss, g_loss, d_acc=None):
     time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(
-        f"{time}\t[{epoch}/{n_epochs}][{len_dataloader}/{len_dataloader}]\tLoss_D: {d_loss:.4f} Loss_G: {g_loss:.4f}"
-    )
+    progress_msg = f"{time}\t[{epoch}/{n_epochs}][{batch}/{n_batch}]\tLoss_D: {d_loss:.4f} Loss_G: {g_loss:.4f}"
+    if d_acc is not None:
+        progress_msg += f" Acc_D: {d_acc:.4f}"
+    print(progress_msg)
 
 
-def print_progress(epoch, n_epochs, len_dataloader, d_loss, g_loss, d_acc):
-    time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(
-        f"{time}\t[{epoch}/{n_epochs}][{len_dataloader}/{len_dataloader}]\tLoss_D: {d_loss:.4f} Loss_G: {g_loss:.4f} Acc_D: {d_acc:.4f}"
-    )
-
-
-def train_gan(
+def train_gan_bce(
     generator,
     discriminator,
     dataloader,
@@ -62,6 +57,7 @@ def train_gan(
     adversarial_loss,
     device,
     args,
+    fixed_noise,
     history,
     sample_interval,
 ):
@@ -119,9 +115,13 @@ def train_gan(
         g_losses.append(g_loss_accum / len(dataloader))
         d_losses.append(d_loss_accum / len(dataloader))
 
-        current_time = datetime.now()
-        print(
-            f"{current_time.strftime('%Y-%m-%d %H:%M:%S')} [Epoch {epoch}/{args.n_epochs}] [D loss: {d_loss.item()}] [G loss: {g_loss.item()}]"
+        print_progress(
+            epoch,
+            args.n_epochs,
+            len(dataloader),
+            len(dataloader),
+            d_losses[-1],
+            g_losses[-1],
         )
 
         if epoch % sample_interval == 0:
@@ -139,6 +139,7 @@ def train_dcgan_bce(
     device,
     args,
     history,
+    fixed_noise,
     sample_interval,
 ):
     g_losses = history["g_losses"]
@@ -228,6 +229,7 @@ def train_dcgan_bce(
             epoch,
             args.n_epochs,
             len(dataloader),
+            len(dataloader),
             d_losses[-1],
             g_losses[-1],
             d_accs[-1],
@@ -251,12 +253,12 @@ def train_dcgan_wasserstein(
     device,
     args,
     history,
+    fixed_noise,
     sample_interval,
     clip_value=0.01,
 ):
     g_losses = history["g_losses"]
     d_losses = history["d_losses"]
-    fixed_noise = torch.randn(args.img_size, args.latent_size, 1, 1, device=device)
 
     one = torch.tensor(1.0, device=device)
     mone = one * -1
@@ -303,7 +305,12 @@ def train_dcgan_wasserstein(
         d_losses.append(d_loss_accum / len(dataloader))
 
         print_progress(
-            epoch, args.n_epochs, len(dataloader), d_losses[-1], g_losses[-1]
+            epoch,
+            args.n_epochs,
+            len(dataloader),
+            len(dataloader),
+            d_losses[-1],
+            g_losses[-1],
         )
 
         if epoch % sample_interval == 0 or epoch == args.n_epochs:

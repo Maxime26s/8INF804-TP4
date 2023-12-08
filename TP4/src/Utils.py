@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+import random
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -76,3 +78,12 @@ def plot_acc(d_accs, epoch_count):
     plt.legend()
     plt.ylim(0, 1)
     plt.show()
+
+
+def set_seed(seed):
+    print("Random Seed: ", seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True)
+    np.random.seed(seed)
+    random.seed(seed)

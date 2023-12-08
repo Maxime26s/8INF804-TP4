@@ -1,12 +1,13 @@
 import argparse
 import json
 import os
+import random
 import torch
 
 import src.GAN as GAN
 import src.DCGAN as DCGAN
 from src.Training import (
-    train_gan,
+    train_gan_bce,
     train_dcgan_bce,
     train_dcgan_wasserstein,
 )
@@ -16,6 +17,7 @@ from src.Utils import (
     display_images,
     plot_acc,
     plot_loss,
+    set_seed,
 )
 
 
@@ -82,6 +84,12 @@ def parse_args():
         choices=["bce", "was"],
         help="Loss function: bce or was (Wasserstein Adversarial Loss)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility",
+    )
     return parser.parse_args()
 
 
@@ -137,10 +145,19 @@ if __name__ == "__main__":
                 args.loss_function = saved_params.get(
                     "loss_function", args.loss_function
                 )
+                args.seed = saved_params.get("seed", args.seed)
 
                 history = saved_params.get(
                     "history", {"g_losses": [], "d_losses": [], "d_accs": []}
                 )
+                history["g_losses"] = history.get("g_losses", [])
+                history["d_losses"] = history.get("d_losses", [])
+                history["d_accs"] = history.get("d_accs", [])
+
+            set_seed(args.seed)
+            fixed_noise = torch.randn(
+                args.img_size, args.latent_size, 1, 1, device=device
+            )
 
             generator_path = os.path.join(
                 args.model_path,
@@ -174,6 +191,11 @@ if __name__ == "__main__":
                     "Saved model states not found for specified epoch. Starting training from scratch."
                 )
         else:
+            set_seed(args.seed)
+            fixed_noise = torch.randn(
+                args.img_size, args.latent_size, 1, 1, device=device
+            )
+
             if args.gan_type == "gan":
                 generator, discriminator = initialize_gan_model(
                     img_shape, args.latent_size, args.normalization_choice, device
@@ -187,6 +209,19 @@ if __name__ == "__main__":
             print(
                 "Saved model parameters not found. Starting training with default parameters."
             )
+    else:
+        set_seed(args.seed)
+        fixed_noise = torch.randn(args.img_size, args.latent_size, 1, 1, device=device)
+
+        if args.gan_type == "gan":
+            generator, discriminator = initialize_gan_model(
+                img_shape, args.latent_size, args.normalization_choice, device
+            )
+        elif args.gan_type == "dcgan":
+            generator, discriminator = initialize_dcgan_model(
+                args.img_size, args.latent_size, args.n_channels, device
+            )
+        print("Initialized generator and discriminator models.")
 
     generator.to(device)
     discriminator.to(device)
@@ -210,7 +245,7 @@ if __name__ == "__main__":
         if args.gan_type == "gan":
             if args.loss_function == "bce":
                 print("Training GAN with Binary Cross Entropy Loss...")
-                train_gan(
+                train_gan_bce(
                     generator,
                     discriminator,
                     dataloader,
@@ -220,6 +255,7 @@ if __name__ == "__main__":
                     device,
                     args,
                     history,
+                    fixed_noise,
                     100,
                 )
             elif args.loss_function == "was":
@@ -237,6 +273,7 @@ if __name__ == "__main__":
                     device,
                     args,
                     history,
+                    fixed_noise,
                     10,
                 )
             elif args.loss_function == "was":
@@ -250,6 +287,7 @@ if __name__ == "__main__":
                     device,
                     args,
                     history,
+                    fixed_noise,
                     10,
                 )
     elif args.mode == "eval":
