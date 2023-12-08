@@ -5,8 +5,18 @@ import torch
 
 import src.GAN as GAN
 import src.DCGAN as DCGAN
-from src.Training import train_and_evaluate_gan, train_and_evaluate_dcgan
-from src.Utils import setup_data_loaders, display_generated_images, display_images
+from src.Training import (
+    train_gan,
+    train_dcgan_bce,
+    train_dcgan_wasserstein,
+)
+from src.Utils import (
+    setup_data_loaders,
+    display_generated_images,
+    display_images,
+    plot_acc,
+    plot_loss,
+)
 
 
 def parse_args():
@@ -49,8 +59,8 @@ def parse_args():
         "--mode",
         type=str,
         default="train",
-        choices=["train", "eval"],
-        help="Mode: train or eval",
+        choices=["train", "eval", "plot"],
+        help="Mode: train, eval or plot",
     )
     parser.add_argument(
         "--current_epoch",
@@ -64,6 +74,13 @@ def parse_args():
         default="gan",
         choices=["gan", "dcgan"],
         help="GAN type: gan or dcgan",
+    )
+    parser.add_argument(
+        "--loss_function",
+        type=str,
+        default="bce",
+        choices=["bce", "was"],
+        help="Loss function: bce or was (Wasserstein Adversarial Loss)",
     )
     return parser.parse_args()
 
@@ -92,17 +109,8 @@ if __name__ == "__main__":
     img_shape = (args.n_channels, args.img_size, args.img_size)
     print(f"Image shape set to: {img_shape}")
 
-    if args.gan_type == "gan":
-        generator, discriminator = initialize_gan_model(
-            img_shape, args.latent_size, args.normalization_choice, device
-        )
-    elif args.gan_type == "dcgan":
-        generator, discriminator = initialize_dcgan_model(
-            args.img_size, args.latent_size, args.n_channels, device
-        )
-    print("Initialized generator and discriminator models.")
-
     # Load model parameters if required
+    history = {"g_losses": [], "d_losses": [], "d_accs": []}
     if args.load_model:
         print(f"Attempting to load model from {args.model_path}...")
         if os.path.exists(args.model_path):
@@ -124,6 +132,15 @@ if __name__ == "__main__":
                 args.current_epoch = saved_params.get(
                     "current_epoch", args.current_epoch
                 )
+                args.n_epochs = saved_params.get("n_epochs", args.n_epochs)
+                args.gan_type = saved_params.get("gan_type", args.gan_type)
+                args.loss_function = saved_params.get(
+                    "loss_function", args.loss_function
+                )
+
+                history = saved_params.get(
+                    "history", {"g_losses": [], "d_losses": [], "d_accs": []}
+                )
 
             generator_path = os.path.join(
                 args.model_path,
@@ -133,7 +150,16 @@ if __name__ == "__main__":
                 args.model_path,
                 f"discriminator_epoch_{args.current_epoch}.pt",
             )
-            print(discriminator_path)
+
+            if args.gan_type == "gan":
+                generator, discriminator = initialize_gan_model(
+                    img_shape, args.latent_size, args.normalization_choice, device
+                )
+            elif args.gan_type == "dcgan":
+                generator, discriminator = initialize_dcgan_model(
+                    args.img_size, args.latent_size, args.n_channels, device
+                )
+            print("Initialized generator and discriminator models.")
 
             if os.path.exists(generator_path) and os.path.exists(discriminator_path):
                 generator.load_state_dict(
@@ -148,6 +174,16 @@ if __name__ == "__main__":
                     "Saved model states not found for specified epoch. Starting training from scratch."
                 )
         else:
+            if args.gan_type == "gan":
+                generator, discriminator = initialize_gan_model(
+                    img_shape, args.latent_size, args.normalization_choice, device
+                )
+            elif args.gan_type == "dcgan":
+                generator, discriminator = initialize_dcgan_model(
+                    args.img_size, args.latent_size, args.n_channels, device
+                )
+            print("Initialized generator and discriminator models.")
+
             print(
                 "Saved model parameters not found. Starting training with default parameters."
             )
@@ -156,7 +192,9 @@ if __name__ == "__main__":
     discriminator.to(device)
     print("Moved models to the designated device.")
 
-    dataloader = setup_data_loaders(args.batch_size, args.img_size, "./images")
+    dataloader = setup_data_loaders(
+        args.batch_size, args.img_size, "./images", args.n_channels
+    )
     print("Data loader setup complete.")
 
     if args.mode == "train":
@@ -170,29 +208,50 @@ if __name__ == "__main__":
         )
 
         if args.gan_type == "gan":
-            train_and_evaluate_gan(
-                generator,
-                discriminator,
-                dataloader,
-                optimizer_G,
-                optimizer_D,
-                adversarial_loss,
-                device,
-                args,
-                100,
-            )
+            if args.loss_function == "bce":
+                print("Training GAN with Binary Cross Entropy Loss...")
+                train_gan(
+                    generator,
+                    discriminator,
+                    dataloader,
+                    optimizer_G,
+                    optimizer_D,
+                    adversarial_loss,
+                    device,
+                    args,
+                    history,
+                    100,
+                )
+            elif args.loss_function == "was":
+                print("Wasserstein Adversarial Loss not implemented for GANs.")
         elif args.gan_type == "dcgan":
-            train_and_evaluate_dcgan(
-                generator,
-                discriminator,
-                dataloader,
-                optimizer_G,
-                optimizer_D,
-                adversarial_loss,
-                device,
-                args,
-                10,
-            )
+            if args.loss_function == "bce":
+                print("Training DCGAN with Binary Cross Entropy Loss...")
+                train_dcgan_bce(
+                    generator,
+                    discriminator,
+                    dataloader,
+                    optimizer_G,
+                    optimizer_D,
+                    adversarial_loss,
+                    device,
+                    args,
+                    history,
+                    10,
+                )
+            elif args.loss_function == "was":
+                print("Training DCGAN with Wasserstein Adversarial Loss...")
+                train_dcgan_wasserstein(
+                    generator,
+                    discriminator,
+                    dataloader,
+                    optimizer_G,
+                    optimizer_D,
+                    device,
+                    args,
+                    history,
+                    10,
+                )
     elif args.mode == "eval":
         print("Entering evaluation mode...")
         generator.eval()
@@ -212,3 +271,12 @@ if __name__ == "__main__":
         # Display generated images
         print("Displaying generated images...")
         display_generated_images(gen_imgs, grayscale=(args.n_channels == 1))
+    elif args.mode == "plot":
+        print(f"Plotting results...")
+        g_losses = history["g_losses"]
+        d_losses = history["d_losses"]
+        d_accs = history["d_accs"]
+        epoch_count = args.current_epoch
+
+        plot_loss(g_losses, d_losses, epoch_count)
+        plot_acc(d_accs, epoch_count)

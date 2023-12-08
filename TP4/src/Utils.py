@@ -4,15 +4,24 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 
-def setup_data_loaders(batch_size, img_size, path_to_images):
-    transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.Grayscale(),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5], [0.5]),
-        ]
-    )
+def setup_data_loaders(batch_size, img_size, path_to_images, n_channels):
+    if n_channels == 1:  # Grayscale images
+        transform = transforms.Compose(
+            [
+                transforms.Resize((img_size, img_size)),
+                transforms.Grayscale(),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5], [0.5]),
+            ]
+        )
+    elif n_channels == 3:  # Color images
+        transform = transforms.Compose(
+            [
+                transforms.Resize((img_size, img_size)),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+            ]
+        )
 
     dataset = datasets.ImageFolder(root=path_to_images, transform=transform)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -44,4 +53,26 @@ def display_generated_images(gen_imgs, grayscale=False):
             ax.imshow(img.numpy())
         ax.axis("off")
     plt.suptitle("Generated Images")
+    plt.show()
+
+
+def plot_loss(g_losses, d_losses, epoch_count):
+    plt.figure(figsize=(10, 5))
+    plt.title("Generator and Discriminator Loss - EPOCH {}".format(epoch_count))
+    plt.plot(g_losses, label="G")
+    plt.plot(d_losses, label="D")
+    plt.xlabel("Iterations")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.show()
+
+
+def plot_acc(d_accs, epoch_count):
+    plt.figure(figsize=(10, 5))
+    plt.title("Discriminator Accuracy - EPOCH {}".format(epoch_count))
+    plt.plot(d_accs, label="D")
+    plt.xlabel("Iterations")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.ylim(0, 1)
     plt.show()
