@@ -23,7 +23,7 @@ from src.Utils import (
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_epochs", type=int, default=50, help="Number of epochs")
+    parser.add_argument("--n_epochs", type=int, default=200, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size")
     parser.add_argument("--lr", type=float, default=0.0002, help="Learning Rate")
     parser.add_argument(
