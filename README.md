@@ -1,10 +1,13 @@
 # 8INF804 - TP4
+
 ## Auteurs
+
 - Maya Legris (LEGM15600100)
 - Tifenn Le Gourriérec (LEGT08590100)
 - Maxime Simard (SIMM26050001)
 
 ## Prérequis
+
 Python >= 3.9
 
 ## Installation
@@ -20,23 +23,27 @@ Python >= 3.9
 ## Utilisation
 
 - Toutes les commandes sont à exécuter à partir de la racine du projet
+- Pour utiliser le projet, vous devez vous-même télécharger le dataset, et répéter les étapes suivantes:
+  - Garder seulement le dossier d'image appelé "NORMAL"
+  - Faire la strcture de fichier suivante: `./images/NORMAL/*.jpg`
 
 ### Environnement virtuel
 
 - Afin de facilité l'utilisation du projet, il est recommandé d'utiliser un environnement virtuel
 - Pour se faire, exécuter la commande suivante:
 
-    `python3 -m venv venv`
+  `python3 -m venv venv`
 
 - Activer l'environnement virtuel sur Windows:
 
-    `.\venv\Scripts\activate`
+  `.\venv\Scripts\activate`
 
 - Pour installer les dépendences, exécuter la commande suivante:
 
-    `pip install -r requirements.txt`
+  `pip install -r requirements.txt`
 
 ### Arguments
+
     usage: tp4 [-h] [--n_epochs N_EPOCHS] [--batch_size BATCH_SIZE] [--lr LR] [--b1 B1] [--b2 B2] [--latent_dim LATENT_DIM] [--img_size IMG_SIZE] [--channels CHANNELS] [--normalization_choice NORMALIZATION_CHOICE] [--load_model LOAD_MODEL] [--model_path MODEL_PATH] [--mode MODE] [--current_epoch CURRENT_EPOCH]
 
     tp4
@@ -65,12 +72,12 @@ Python >= 3.9
 
 - Pour exécuter le programme en mode d'entraînement :
 
-    `python3 tp4 --mode train`
+  `python3 tp4 --mode train`
 
 - Pour évaluer et générer des images à l'aide d'un modèle pré-entraîné :
 
-    `python3 tp4 --mode eval --load_model 1 --model_path ./models --current_epoch 4000`
+  `python3 tp4 --mode eval --load_model 1 --model_path ./models --current_epoch 4000`
 
 - Pour personnaliser davantage la configuration de l'entraînement, utilisez les arguments disponibles, par exemple :
 
-    `python3 tp4 --mode train --n_epochs 10000 --batch_size 2048 --lr 0.0002 --latent_dim 64 --img_size 64 --channels 1 --normalization_choice 4`
+  `python3 tp4 --mode train --n_epochs 10000 --batch_size 2048 --lr 0.0002 --latent_dim 64 --img_size 64 --channels 1 --normalization_choice 4`
