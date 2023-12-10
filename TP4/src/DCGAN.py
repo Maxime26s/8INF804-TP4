@@ -28,7 +28,7 @@ def weights_init(m):
 class Generator(nn.Module):
     def __init__(self, img_size, latent_size, n_channels):
         super(Generator, self).__init__()
-        self.main = nn.Sequential(
+        self.model = nn.Sequential(
             nn.ConvTranspose2d(latent_size, img_size * 8, 4, 1, 0, bias=False),
             nn.BatchNorm2d(img_size * 8),
             nn.ReLU(True),
@@ -46,13 +46,13 @@ class Generator(nn.Module):
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.model(input)
 
 
 class Discriminator(nn.Module):
     def __init__(self, img_size, n_channels):
         super(Discriminator, self).__init__()
-        self.main = nn.Sequential(
+        self.model = nn.Sequential(
             nn.Conv2d(n_channels, img_size, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(img_size, img_size * 2, 4, 2, 1, bias=False),
@@ -69,4 +69,4 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.model(input)

@@ -93,9 +93,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def initialize_gan_model(img_shape, latent_size, normalization_choice, device):
-    generator = GAN.Generator(img_shape, latent_size, normalization_choice).to(device)
-    discriminator = GAN.Discriminator(img_shape, normalization_choice).to(device)
+def initialize_gan_model(img_size, latent_size, n_channels, device):
+    generator = GAN.Generator(img_size, latent_size, n_channels).to(device)
+    discriminator = GAN.Discriminator(img_size, n_channels).to(device)
     return generator, discriminator
 
 
@@ -154,11 +154,6 @@ if __name__ == "__main__":
                 history["d_losses"] = history.get("d_losses", [])
                 history["d_accs"] = history.get("d_accs", [])
 
-            set_seed(args.seed)
-            fixed_noise = torch.randn(
-                args.img_size, args.latent_size, 1, 1, device=device
-            )
-
             generator_path = os.path.join(
                 args.model_path,
                 f"generator_epoch_{args.current_epoch}.pt",
@@ -168,11 +163,21 @@ if __name__ == "__main__":
                 f"discriminator_epoch_{args.current_epoch}.pt",
             )
 
+            set_seed(args.seed)
+
             if args.gan_type == "gan":
+                fixed_noise = torch.randn(
+                    args.img_size, args.latent_size, device=device
+                )
+
                 generator, discriminator = initialize_gan_model(
-                    img_shape, args.latent_size, args.normalization_choice, device
+                    args.img_size, args.latent_size, args.n_channels, device
                 )
             elif args.gan_type == "dcgan":
+                fixed_noise = torch.randn(
+                    args.img_size, args.latent_size, 1, 1, device=device
+                )
+
                 generator, discriminator = initialize_dcgan_model(
                     args.img_size, args.latent_size, args.n_channels, device
                 )
@@ -192,15 +197,20 @@ if __name__ == "__main__":
                 )
         else:
             set_seed(args.seed)
-            fixed_noise = torch.randn(
-                args.img_size, args.latent_size, 1, 1, device=device
-            )
 
             if args.gan_type == "gan":
+                fixed_noise = torch.randn(
+                    args.img_size, args.latent_size, device=device
+                )
+
                 generator, discriminator = initialize_gan_model(
-                    img_shape, args.latent_size, args.normalization_choice, device
+                    args.img_size, args.latent_size, args.n_channels, device
                 )
             elif args.gan_type == "dcgan":
+                fixed_noise = torch.randn(
+                    args.img_size, args.latent_size, 1, 1, device=device
+                )
+
                 generator, discriminator = initialize_dcgan_model(
                     args.img_size, args.latent_size, args.n_channels, device
                 )
@@ -211,13 +221,17 @@ if __name__ == "__main__":
             )
     else:
         set_seed(args.seed)
-        fixed_noise = torch.randn(args.img_size, args.latent_size, 1, 1, device=device)
-
         if args.gan_type == "gan":
+            fixed_noise = torch.randn(args.img_size, args.latent_size, device=device)
+
             generator, discriminator = initialize_gan_model(
-                img_shape, args.latent_size, args.normalization_choice, device
+                args.img_size, args.latent_size, args.n_channels, device
             )
         elif args.gan_type == "dcgan":
+            fixed_noise = torch.randn(
+                args.img_size, args.latent_size, 1, 1, device=device
+            )
+
             generator, discriminator = initialize_dcgan_model(
                 args.img_size, args.latent_size, args.n_channels, device
             )
@@ -234,7 +248,7 @@ if __name__ == "__main__":
 
     if args.mode == "train":
         print("Entering training mode...")
-        adversarial_loss = torch.nn.BCELoss()
+        criterion = torch.nn.BCELoss()
         optimizer_G = torch.optim.Adam(
             generator.parameters(), lr=args.lr, betas=(args.b1, args.b2)
         )
@@ -251,12 +265,12 @@ if __name__ == "__main__":
                     dataloader,
                     optimizer_G,
                     optimizer_D,
-                    adversarial_loss,
+                    criterion,
                     device,
                     args,
                     history,
                     fixed_noise,
-                    100,
+                    10,
                 )
             elif args.loss_function == "was":
                 print("Wasserstein Adversarial Loss not implemented for GANs.")
@@ -269,7 +283,7 @@ if __name__ == "__main__":
                     dataloader,
                     optimizer_G,
                     optimizer_D,
-                    adversarial_loss,
+                    criterion,
                     device,
                     args,
                     history,
